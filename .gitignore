@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+# 背景素材库单独在 Releases 里下载
+assets/backgrounds/*.mp4
+assets/backgrounds/library.json
+assets/backgrounds/library_overview.jpg
+assets/fonts/

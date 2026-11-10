@@ -1,0 +1,39 @@
+{
+  "_说明": "分镜表（空白模板）。时间全部写成相对歌词的表达式：L(i)=第i句起点，E(i)=终点，W(i,'字')=第i句里这个字唱出来的时间，B=一拍。字段说明见 skill 的 references/visuals.md。",
+  "timing": "timing.json",
+  "graphics": "graphics.py",
+
+  "banner": {
+    "parts": [["口诀：", "L(5)+0.8"], ["前半句，", "L(6)"], ["后半句", "L(6)+2*B"]],
+    "pulses": ["L(15)", "L(23)"]
+  },
+
+  "formulas": [
+    {"show": "L(9)", "hide": "L(12)", "tokens": [["1", "white", 70, "L(9)+0.3"], [" + 2", "white", 70, "L(9)+1.0"], [" = 3", "yellow", 92, "L(10)+0.5"]]}
+  ],
+
+  "keywords": [
+    {"text": "=？", "show": "L(2)+0.5", "pop": "L(2)+0.6", "hide": "L(3)", "x": 1640, "y": 550, "size": 180},
+    {"text": "口诀前半", "show": "L(15)", "pop": "L(15)+0.05", "hide": "L(16)", "x": 960, "y": 420, "size": 150, "color": "yellow", "stroke": 4},
+    {"text": "口诀后半", "show": "L(15)", "pop": "L(15)+2*B", "hide": "L(16)", "x": 960, "y": 620, "size": 150, "color": "yellow", "stroke": 4}
+  ],
+
+  "arrows": [],
+
+  "backgrounds": {
+    "seed": 1,
+    "plan": [
+      ["T0", "problem"],
+      ["L(3)", "trap"],
+      ["L(5)", "reveal"],
+      ["L(7)", "transition"],
+      ["L(9)", "demo:quiet"],
+      ["L(12)", "demo:quiet"],
+      ["L(15)", "hook"],
+      ["L(17)", "principle:quiet"],
+      ["L(19)", "principle:quiet"],
+      ["L(21)", "aha"],
+      ["L(23)", "outro"]
+    ]
+  }
+}

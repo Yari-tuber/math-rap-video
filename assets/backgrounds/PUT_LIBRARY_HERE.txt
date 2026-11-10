@@ -1,0 +1,6 @@
+背景素材库不在这个安装包里（约 100 MB，单独下载：backgrounds_library.zip，在 GitHub 仓库的 Releases 里）。
+
+安放办法（任选一种）：
+1) 运行  python scripts/install.py --library <backgrounds_library.zip 的路径>
+   它会放到共享位置 ~/.math-rap-video/backgrounds/，这台电脑上各个 AI 工具里的本 skill 都能找到。
+2) 把压缩包直接解压到这个文件夹（解压后这里应该有 library.json 和 BGxx_*.mp4）。
