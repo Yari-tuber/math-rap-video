@@ -1,0 +1,49 @@
+{
+ "_说明": "勾股定理的分镜。时间全部相对歌词：L(i)=第i句起点，W(i,'字')=第i句里这个字唱出来的时间，B=一拍。换一版音频重跑 mrv.py song 就行，这里不用改。想换长相：把 style 改成 cinema / chalk / glow（mrv.py styles 看全部）。",
+ "style": "glow",
+ "timing": "timing.json",
+ "graphics": "graphics.py",
+
+ "banner": {
+  "parts": [["口诀：", "W(5,'口')"], ["两直边平方加，", "L(6)"], ["斜边平方就是它", "W(6,'斜')"]],
+  "pulses": ["L(15)", "W(15,'斜')", "L(23)"]
+ },
+
+ "formulas": [
+  {"show": "L(8)", "hide": "L(10)", "tokens": [["3²", "white", 70, "W(8,'三')"], [" + 4²", "white", 70, "W(8,'四')"], [" = 9 + 16", "white", 70, "W(9,'九')"], [" = 25", "yellow", 86, "W(9,'二')"]]},
+  {"show": "L(10)", "hide": "L(11)", "tokens": [["√25", "white", 70, "L(10)+0.3"], [" = 5", "yellow", 90, "W(10,'五',2)"]]},
+  {"show": "L(11)", "hide": "L(12)", "tokens": [["6² + 8²", "white", 70, "L(11)+0.4"], [" = 100", "yellow", 86, "W(11,'百')"]]},
+  {"show": "L(12)", "hide": "L(13)", "tokens": [["√100", "white", 70, "L(12)+0.3"], [" = 10", "yellow", 90, "W(12,'十')"]]},
+  {"show": "L(14)", "hide": "L(15)", "tokens": [["a² + b² = c²", "yellow", 84, "L(14)+0.3"]]},
+  {"show": "L(22)", "hide": "T_END", "tokens": [["a² + b²", "white", 76, "L(22)+0.3"], [" = c²", "yellow", 92, "W(22,'一')"]]}
+ ],
+
+ "keywords": [
+  {"text": "=？", "show": "L(2)+0.5", "pop": "L(2)+0.62", "hide": "L(3)", "x": 1600, "y": 470, "size": 170, "pop_dur": 0.25},
+  {"text": "量不准", "show": "W(3,'歪')", "pop": "W(3,'歪')+0.05", "hide": "L(4)", "x": 1600, "y": 360, "size": 100, "color": "red"},
+  {"text": "越量越乱", "show": "L(4)+0.3", "pop": "L(4)+0.4", "hide": "L(5)", "x": 1600, "y": 360, "size": 100},
+  {"text": "两直边平方加", "show": "L(15)", "pop": "L(15)+0.05", "hide": "L(16)", "x": 960, "y": 420, "size": 140, "color": "yellow", "stroke": 4},
+  {"text": "斜边平方就是它", "show": "L(15)", "pop": "W(15,'斜')", "hide": "L(16)", "x": 960, "y": 620, "size": 140, "color": "yellow", "stroke": 4},
+  {"text": "就这么简单", "show": "L(16)+0.3", "pop": "L(16)+0.45", "hide": "L(17)", "x": 960, "y": 520, "size": 150, "stroke": 4, "rotate": 5, "pop_dur": 0.25},
+  {"text": "勾 = 3", "show": "W(13,'勾')", "pop": "W(13,'勾')+0.02", "hide": "L(14)", "x": 1560, "y": 360, "size": 90},
+  {"text": "股 = 4", "show": "W(13,'股')", "pop": "W(13,'股')+0.02", "hide": "L(14)", "x": 1560, "y": 470, "size": 90},
+  {"text": "弦 = 5", "show": "W(13,'弦')", "pop": "W(13,'弦')+0.02", "hide": "L(14)", "x": 1560, "y": 580, "size": 90, "color": "yellow"}
+ ],
+
+ "backgrounds": {
+  "_说明": "画风 glow 默认是深蓝网格底，不用素材库。换成 cinema（暗色电影镜头）时，用下面的 plan 按用途挑素材库里的片段。",
+  "seed": 1,
+  "plan": [
+   ["T0", "problem"],
+   ["L(3)", "trap"],
+   ["L(5)", "reveal"],
+   ["L(8)", "demo:quiet"],
+   ["L(11)", "demo:quiet"],
+   ["L(15)", "hook"],
+   ["L(17)", "principle:quiet"],
+   ["L(20)", "principle:quiet"],
+   ["L(22)", "aha"],
+   ["L(24)", "outro"]
+  ]
+ }
+}

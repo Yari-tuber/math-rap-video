@@ -5,6 +5,7 @@
     python prepare_audio.py <作品目录> --audio 歌.mp3 --srt 识别.srt        # 任何工具导出的 SRT（剪映、Whisper、平台自带字幕…）
     python prepare_audio.py <作品目录> --audio 歌.mp3 --words x.words.json  # 带逐字时间的 JSON（words:[{text,start_time,end_time}]）
     python prepare_audio.py <作品目录> --audio 歌.mp3 --grid --entry 5.3    # 没有字幕：按"一句一小节"从人声进入点推算
+    可选: --refine 强制对齐.words.json   用「按歌词原文强制对齐」的结果补上识别没对上的字（两种对齐各有错处，合起来最准）
     可选: --lyrics 歌词文件（默认 lyrics.md）   --bpm 90（速度提示）   --no-beat（纯讲解配音，没有节拍）
           --intro-bars 2（约定的前奏小节数，用来判断人声是不是进晚了）
           --out timing_02.json（比较多版音频时，每版写到不同文件，选定后复制成 timing.json）
@@ -37,6 +38,7 @@ ap.add_argument("--audio", required=True)
 ap.add_argument("--srt")
 ap.add_argument("--words")
 ap.add_argument("--grid", action="store_true")
+ap.add_argument("--refine", help="可选：按原文做过强制对齐的逐字 JSON。识别没对上的字，改用它的时间（比插值准）")
 ap.add_argument("--entry", type=float, help="--grid 时人声进入的秒数")
 ap.add_argument("--bars-per-line", type=float, default=1.0)
 ap.add_argument("--lyrics", default=None, help="歌词文件，默认 lyrics.md（没有则找 歌词.md）")
@@ -51,9 +53,12 @@ work = Path(args.work).resolve()
 audio = Path(args.audio).resolve()
 if not audio.exists():
     sys.exit(f"找不到音频 {audio}")
-if audio.parent != work:
+try:                       # 作品目录里（包括 歌/ 子文件夹）的音频直接用，外面的才复制进来
+    audio.relative_to(work)
+except ValueError:
     shutil.copy2(audio, work / audio.name)
     audio = work / audio.name
+AUDIO_REL = audio.relative_to(work).as_posix()
 
 # ---------------- 歌词 ----------------
 if args.lyrics:
@@ -143,6 +148,8 @@ if not args.no_beat:
     tempo0 = float(np.atleast_1d(librosa.feature.tempo(onset_envelope=env, sr=SR))[0])
     if args.bpm:  # 检测结果常是一半或两倍，按提示取最近的倍数
         tempo0 = min((tempo0 * m for m in (0.5, 2 / 3, 1, 1.5, 2)), key=lambda x: abs(x - args.bpm))
+        if abs(tempo0 - args.bpm) / args.bpm > 0.06:  # 检测结果离约定的速度太远（常见于前奏很空的歌），以约定的为准
+            tempo0 = args.bpm
     best = (-1.0, 60 / tempo0, 0.0)
     # 不用 librosa.beat.beat_track（部分环境 numba 会崩），直接拟合恒定网格
     for b in np.arange(tempo0 * 0.97, tempo0 * 1.03, 0.02):
@@ -190,22 +197,62 @@ else:
         sys.exit(f"歌词和识别结果只对上 {sum(matched)}/{len(L)} 个字：确认歌词文件和音频是同一首")
     med = sorted(e - s for _, s, e in timeline)[len(timeline) // 2] or 0.17
     idx = [k for k, m in enumerate(matched) if m]
-    for k in range(len(L)):  # 没对上的字：前后插值
+    fine = None  # 强制对齐的逐字时间（字数和歌词一样时才能一一对应）
+    if args.refine:
+        d2 = json.loads(Path(args.refine).read_text(encoding="utf-8-sig"))
+        t2 = []
+        for w in d2["words"]:
+            cs = norm_chars(w.get("text", ""))
+            s2 = w.get("start_time", w.get("start"))
+            e2 = w.get("end_time", w.get("end", s2))
+            for j, c in enumerate(cs):
+                t2.append((s2 + (e2 - s2) * j / len(cs), s2 + (e2 - s2) * (j + 1) / len(cs)))
+        if len(t2) == len(L):
+            fine = t2
+        else:
+            print(f"--refine 的字数（{len(t2)}）和歌词（{len(L)}）不一样，没有使用", file=sys.stderr)
+    refined = 0
+    last_t = None
+    for k in range(len(L)):  # 没对上的字：先看强制对齐给的时间合不合理，不合理再前后插值
         if matched[k]:
+            last_t = t_start[k]
             continue
         prev = max((j for j in idx if j < k), default=None)
         nxt = min((j for j in idx if j > k), default=None)
+        if fine is not None:
+            # 头尾没有前（后）一个对上的字时，只接受离得不远的时间：强制对齐常把开头的字拖到 0 秒
+            lo = (t_end[prev] - 0.1) if prev is not None else t_start[nxt] - (nxt - k) * med * 2.5 - 0.3
+            hi = (t_start[nxt] + 0.02) if nxt is not None else t_end[prev] + (k - prev) * med * 2.5 + 0.3
+            c0 = fine[k][0]
+            if lo <= c0 <= hi and (last_t is None or c0 >= last_t - 0.02):
+                t_start[k] = c0
+                t_end[k] = min(max(fine[k][1], c0 + 0.04), hi if nxt is not None else c0 + med)
+                last_t = c0
+                refined += 1
+                continue
         if prev is not None and nxt is not None:
             a, b = t_end[prev], t_start[nxt]
-            f0 = (k - prev - 1) / (nxt - prev - 1)
-            f1 = (k - prev) / (nxt - prev - 1)
-            t_start[k], t_end[k] = a + (b - a) * f0, a + (b - a) * f1
+            if b - a > (nxt - prev - 1) * med * 1.8 + 0.3:
+                # 中间有一段没人声的空隙（间奏、换气）：没对上的字不往空隙里摊，
+                # 和后一个对上的字同一句的，贴着后面；否则贴着前面。不然整句会被提前。
+                if L[k][1] == L[nxt][1]:
+                    t_start[k] = b - (nxt - k) * med
+                else:
+                    t_start[k] = a + (k - prev - 1) * med
+                t_end[k] = t_start[k] + med
+            else:
+                f0 = (k - prev - 1) / (nxt - prev - 1)
+                f1 = (k - prev) / (nxt - prev - 1)
+                t_start[k], t_end[k] = a + (b - a) * f0, a + (b - a) * f1
         elif prev is not None:
             t_start[k] = t_end[prev] + (k - prev - 1) * med
             t_end[k] = t_start[k] + med
         else:
             t_start[k] = t_start[nxt] - (nxt - k) * med
             t_end[k] = t_start[k] + med
+        last_t = t_start[k]
+    if fine is not None:
+        print(f"识别没对上的字共 {len(L) - len(idx)} 个，其中 {refined} 个用了强制对齐的时间")
     for li, text in enumerate(lyrics):
         ks = [k for k, (_, l2, _) in enumerate(L) if l2 == li]
         if not ks:
@@ -284,7 +331,7 @@ if low and len(low) > max(2, len(lines) // 6):
 report.update(verdict="换一版" if problems else "可用", problems=problems, skipped_lines=skipped,
               entry_bars=round(entry_bars, 2))
 
-out = {"audio": audio.name, "duration": round(DUR, 3), "bpm": bpm, "beat0": beat0, "bar": round(BAR, 4),
+out = {"audio": AUDIO_REL, "duration": round(DUR, 3), "bpm": bpm, "beat0": beat0, "bar": round(BAR, 4),
        "has_beat": not args.no_beat, "t0": t0, "t_end": t_end, "lines": lines, "report": report}
 (work / args.out).write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
 

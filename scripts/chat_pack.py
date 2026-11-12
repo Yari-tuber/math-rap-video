@@ -13,10 +13,10 @@
 
 完整的一轮：
     1. lyrics → 把 AI 的回答存成 <作品目录>/lyrics.md → python check_lyrics.py <作品目录>
-    2. 按 references/audio.md 准备音频 → python prepare_audio.py …
+    2. 按 <作品目录>/给音乐模型/ 生成歌 → python mrv.py song <作品目录> --song 歌.mp3
     3. visuals → 把 AI 给的两个文件存进作品目录
     4. fix → 有报错或画面不对就把提示包和预览图一起发给 AI，改完再运行 fix，直到没有问题
-    5. python build_video.py <作品目录> all
+    5. python mrv.py render <作品目录>
 """
 import subprocess
 import sys
@@ -143,7 +143,7 @@ for need in ("storyboard.json", "graphics.py"):
     if not (work / need).exists():
         sys.exit(f"{work} 里没有 {need}")
 if not (work / "timing.json").exists():
-    sys.exit(f"{work} 里还没有 timing.json。先按 SKILL.md 第 3 步运行 prepare_audio.py（需要音频）")
+    sys.exit(f"{work} 里还没有 timing.json。先运行 python mrv.py song <作品目录> --song 歌.mp3（需要音频）")
 engine = str(SKILL / "scripts" / "overlay_engine.py")
 r = subprocess.run([sys.executable, engine, str(work), "check"], capture_output=True, text=True, encoding="utf-8", errors="replace")
 report = (r.stdout + ("\n" + r.stderr if r.stderr.strip() else "")).strip()
@@ -181,7 +181,7 @@ print(report)
 print(f"\n已生成 {out}")
 if sheet_ok:
     print("预览图已生成：作品目录里的 分镜预览_p1.jpg …（每页 6 句）。把它们和上面的文件一起发给聊天 AI，也自己看一遍。")
-    print("没有问题就可以出片：python build_video.py <作品目录> all")
+    print("没有问题就可以出片：python mrv.py render <作品目录>")
 else:
     print("检查没有通过，所以还没有预览图。把上面的文件发给聊天 AI，按它改好的文件覆盖后再运行一次 fix。")
 sys.exit(0 if r.returncode == 0 else 1)

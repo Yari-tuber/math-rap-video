@@ -42,11 +42,10 @@
 |---|---|---|
 | 写词、分镜 | 任何大模型，按 `lyrics.md` 的规则 | — |
 | 音频 | 客户自带 | Suno、海绵音乐、Mureka、天工、ElevenLabs Music；真人录音；TTS + 伴奏 |
-| 识别字幕 | 任何能导出 SRT 的工具 | 剪映、Whisper 类工具、各家云端识别 |
-| 算时间 | `prepare_audio.py` | 手工在剪映里对字幕 |
+| 算时间 | `mrv.py song`：分人声 + 按歌词逐字强制对齐（Qwen3-ForcedAligner），不用自己识别字幕 | 剪映「文稿匹配」后手工对 |
 | 背景 | 自带素材库（AI 视频模型生成，按 9 种用途打标签） | 可灵、即梦、Veo、Runway 自己生成；实拍 |
-| 图形动画 | Python 逐帧画（`overlay_engine.py` + 每题一个 `graphics.py`） | Manim（专做数学动画）、剪映关键帧、PPT 动画录屏 |
-| 合成 | ffmpeg（`build_video.py`） | 剪映、Premiere、达芬奇 |
+| 图形动画 | Python 逐帧画（引擎 + 每题一个 `graphics.py`），画风可换 | Manim（专做数学动画）、剪映关键帧、PPT 动画录屏 |
+| 合成 | ffmpeg（`mrv.py render`） | 剪映、Premiere、达芬奇 |
 
 这套做法能稳定出片，靠的是三条设计：
 

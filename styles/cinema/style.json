@@ -1,0 +1,26 @@
+{
+  "id": "cinema",
+  "name": "暗色电影感",
+  "desc": "暗色电影镜头当背景，蓝色图形、黄色结果、白字黑底字幕。最像抖音上那种口诀说唱讲题，什么题都能用。",
+  "palette": {
+    "text": "#FFFFFF",
+    "primary": "#4C8DFF",
+    "primary_dark": "#285CC8",
+    "primary_light": "#82B9FF",
+    "highlight": "#EC546A",
+    "result": "#FFD84A",
+    "accent": "#FF6030",
+    "ok": "#5CD68C",
+    "muted": "#9696A0",
+    "line": "#E6ECFF",
+    "stroke": "#000000"
+  },
+  "banner": { "y": 78, "size": 84, "color": "text", "stroke": 3 },
+  "formula": { "y": 830 },
+  "subtitles": { "y": 1010, "size": 64, "color": "text", "box": true, "box_color": "#000000", "box_alpha": 165 },
+  "glow": null,
+  "backgrounds": {
+    "source": "library",
+    "grade": "eq=brightness=-0.16:saturation=0.65:contrast=1.05,vignette=PI/3.2"
+  }
+}

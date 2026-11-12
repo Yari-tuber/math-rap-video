@@ -1,0 +1,37 @@
+{
+  "id": "glow",
+  "name": "发光线条",
+  "desc": "深蓝夜色底加淡网格，图形是发光的青色线条，口诀用粗宋体，像「vibe 知识大赏」那种高级感。适合想要好看、有氛围的题。",
+  "palette": {
+    "text": "#EAF6FF",
+    "primary": "#46E0D2",
+    "primary_dark": "#1FA89D",
+    "primary_light": "#9CF5EC",
+    "highlight": "#FF7A59",
+    "result": "#FFC24A",
+    "accent": "#FF9A3C",
+    "ok": "#7CF0A0",
+    "muted": "#6F8496",
+    "line": "#BFE9FF",
+    "stroke": "#06101C"
+  },
+  "fonts": {
+    "heavy": [
+      "~/.math-rap-video/fonts/NotoSerifSC-VF.ttf",
+      "C:/Windows/Fonts/NotoSerifSC-VF.ttf",
+      "/System/Library/Fonts/Supplemental/Songti.ttc",
+      "/usr/share/fonts/opentype/noto/NotoSerifCJK-Black.ttc"
+    ]
+  },
+  "banner": { "y": 80, "size": 82, "color": "text", "stroke": 2 },
+  "formula": { "y": 830 },
+  "subtitles": { "y": 1010, "size": 56, "color": "text", "box": true, "box_color": "#0A1626", "box_alpha": 150, "radius": 18 },
+  "glow": { "radius": 16, "strength": 0.9 },
+  "backgrounds": {
+    "source": "color",
+    "color": "#0B1A2C",
+    "color2": "#040A14",
+    "texture": "grid",
+    "grade": "vignette=PI/3.6"
+  }
+}

@@ -13,7 +13,7 @@
 | 箭头 | 图形上方 | 橙红渐变 + 标签 | 引擎 `arrows` |
 | 公式 | y≈830 居中（占 780–880） | 白色 64–70 逐项弹出，结果黄色 84–92 | 引擎 `formulas` |
 | 字幕 | 底部，占 y≈960–1060 | 白字 64 + 半透明黑底，一句一换 | 引擎，自动 |
-| 背景 | 全屏 | 素材库片段，自动压暗、降饱和、加暗角 | `build_video.py` |
+| 背景 | 全屏 | 画风决定：素材库片段 / 黑板 / 网格 / 自己的视频或图，统一压暗 | `references/styles.md` |
 
 配色名：`white` `yellow` `red` `blue` `blue_dark` `blue_light` `green` `gray` `orange` `line`（浅色线）。也可以写 `[r,g,b]` 或 `[r,g,b,a]`（a 是 0–255 的不透明度）。
 
@@ -41,7 +41,7 @@
 | `T0` / `T_END` | 成片的起止（默认：第一句前 0.18 秒到最后一句后 0.35 秒） |
 | `NL` | 总句数 |
 
-为什么：画面要卡在唱词上，而每版音频的时间都不一样。写成 `W(10,'十')`，"=10条"就永远在唱到"十"的那一下出现；客户换了音频，重跑 `prepare_audio.py` 就行。
+为什么：画面要卡在唱词上，而每版音频的时间都不一样。写成 `W(10,'十')`，"=10条"就永远在唱到"十"的那一下出现；换了音频，重跑 `mrv.py song` 就行。
 
 `W()` 里的字必须在那句歌词里原样出现，否则 `check` 会报"第 N 句里找不到…"。可以写一个字，也可以写连着的几个字（`W(10,'五千')` 是"五千"开始唱的时间）。
 
@@ -49,7 +49,7 @@
 
 ```jsonc
 {
-  "timing": "timing.json",          // prepare_audio.py 的输出
+  "timing": "timing.json",          // mrv.py song 的输出
   "graphics": "graphics.py",        // 本题图形；不需要图形时可以不写
 
   "banner": {                       // 顶部口诀
@@ -86,6 +86,8 @@
 ```
 
 公式的规则：同一时间只能有一条公式显示在同一行。下一条的 `show` 要不早于上一条的 `hide`；确实要同时显示两条，就给其中一条写不同的 `y`（如 740）。`check` 会报同行重叠的公式。
+
+画风：`"style": "cinema" / "chalk" / "glow"`，见 `references/styles.md`。颜色写语义名（`primary` 主图形、`result` 结果、`highlight` 正在讲的、`text` 正文……）就跟着画风变；旧名字 `blue` `yellow` `red` `white` 也照样能用。
 
 其他可选字段：`fonts`（`{"heavy": ["路径"], "subtitle": ["路径"]}`）、`colors`（改配色）、`subtitles`（`{"y":1010,"size":64,"enabled":true}`）、`t0` / `t_end`（覆盖成片起止）、`backgrounds.library` / `grade` / `lead`。
 
@@ -184,17 +186,19 @@ def draw(canvas, t, ctx):           # 每帧调用；t 是音频时间
 
 ## 7. 预览和排查
 
+平时用 `mrv.py check`（检查 + 每句一格的预览图）就够了。下面是单独排查某一段时用的：
+
 ```bash
-python $SKILL/scripts/overlay_engine.py <目录> png "L(9)+1.5"              # 单帧（深色底）→ 预览_<秒>.png
-python $SKILL/scripts/overlay_engine.py <目录> sheet                        # 每句一格的总览
-python $SKILL/scripts/overlay_engine.py <目录> sheet --at 0.5               # 改成取每句中间
-python $SKILL/scripts/overlay_engine.py <目录> sheet --pages                # 总览 + 大图分页（每格 960×540）
-python $SKILL/scripts/overlay_engine.py <目录> frames "L(18)" "L(19)" 0.2   # 一段动画逐帧排开
-python $SKILL/scripts/overlay_engine.py <目录> info "W(9,'四',2)" "L(12)"   # 查某个时间表达式是几秒
-python $SKILL/scripts/overlay_engine.py <目录> check                        # 时间写法、试画、版面提醒
+python <skill>/scripts/overlay_engine.py <目录> png "L(9)+1.5"              # 单帧（深色底）→ 预览_<秒>.png
+python <skill>/scripts/overlay_engine.py <目录> sheet                        # 每句一格的总览
+python <skill>/scripts/overlay_engine.py <目录> sheet --at 0.5               # 改成取每句中间
+python <skill>/scripts/overlay_engine.py <目录> sheet --pages                # 总览 + 大图分页（每格 960×540）
+python <skill>/scripts/overlay_engine.py <目录> frames "L(18)" "L(19)" 0.2   # 一段动画逐帧排开
+python <skill>/scripts/overlay_engine.py <目录> info "W(9,'四',2)" "L(12)"   # 查某个时间表达式是几秒
+python <skill>/scripts/overlay_engine.py <目录> check                        # 时间写法、试画、版面提醒
 ```
 
 - 总览图每格只有 480×270，只能看"有没有、对不对"；文字压边要看 `--pages` 的大图
 - 总览默认取每句快唱完的时刻。句中才出现又消失的东西，用 `--at 0.5` 或 `frames` 看
 - `check` 的"版面提醒"会报：图形顶到口诀横幅、压到字幕、和公式行重叠、碰到画面边缘、图形持续偏小、画面中间空着，并给出是第几句、第几秒。"文字互相压住"会报出是哪两块文字（`st.text`、`st.tokens`、弹字、公式之间）。它查不出文字压在线条或色块上，这要看 `--pages` 的大图。它按图形层的外框判断，自己画的说明文字靠得近也会报，所以要用 `frames` 看一眼再决定改不改
-- 预览图是深色底，看不到背景。背景上的效果在出片后的 `成片_总览.jpg` 里看
+- 预览图垫的是画风的背景色（cinema 是深色底，看不到素材库里的镜头）。背景上的效果在出片后的 `成片_总览.jpg` 里看

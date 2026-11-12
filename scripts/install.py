@@ -2,17 +2,22 @@
 
 用法:
     python install.py --list                      # 看这台电脑上找到了哪些 AI 工具
-    python install.py --to all                    # 装到所有找到的工具
-    python install.py --to codex gemini           # 只装到指定的工具
+    python install.py --to all                    # 装到常用位置 + 这台电脑上找到的工具，顺便下好背景素材库（推荐）
+    python install.py --to all --no-library       # 只装 skill，不下素材库（只用黑板 / 发光画风时可以不要）
+    python install.py --get-library               # 只下背景素材库（97 MB，26 段 AI 生成的暗色镜头）
+    python install.py --to dsh claude             # 只装到指定的工具
     python install.py --to D:/somewhere/skills    # 装到任意文件夹（会在里面建 math-rap-video/）
     python install.py --library 素材库_背景.zip    # 安放背景素材库（zip 或已解压的文件夹）
     python install.py --to all --library 素材库_背景.zip   # 两件事一起做
 
 说明:
-- 各工具存放 skill 的文件夹（存在才会装）：
-    claude    ~/.claude/skills            codex   ~/.codex/skills
-    gemini    ~/.gemini/skills            opencode ~/.config/opencode/skills
-    agents    ~/.agents/skills（多个工具共用的约定位置）
+- 各工具存放 skill 的文件夹：
+    agents    ~/.agents/skills   通用位置：Codex、Gemini CLI、opencode、Cursor、DeepSeek Harness、Kimi 都读（总是装）
+    claude    ~/.claude/skills   Claude Code、Claude 桌面版（总是装）
+    dsh       ~/.dsh/skills      DeepSeek Harness（总是装）
+    其他（这台电脑上有才装）：trae、trae-cn、qoder、codebuddy、lingma、qwen、opencode、gemini
+    codex-legacy ~/.codex/skills  旧版 Codex，只有点名时才装
+- 装完要在那个 AI 工具里新开一个对话，它才认得出来。
 - 素材库放到共享位置 ~/.math-rap-video/backgrounds/，各工具里的副本都会自动找到它，
   所以 skill 副本本身不带视频文件，只有几百 KB。
 - 重复运行是安全的：已有的同名 skill 会被新版本替换；素材库已存在时不会重复复制。
@@ -35,19 +40,30 @@ NAME = "math-rap-video"
 HOME = Path.home()
 SHARED = HOME / ".math-rap-video" / "backgrounds"
 TOOLS = {
-    "claude": HOME / ".claude" / "skills",
-    "codex": HOME / ".codex" / "skills",
-    "gemini": HOME / ".gemini" / "skills",
-    "opencode": HOME / ".config" / "opencode" / "skills",
     "agents": HOME / ".agents" / "skills",
+    "claude": HOME / ".claude" / "skills",
+    "dsh": HOME / ".dsh" / "skills",
+    "trae": HOME / ".trae" / "skills",
+    "trae-cn": HOME / ".trae-cn" / "skills",
+    "qoder": HOME / ".qoder" / "skills",
+    "codebuddy": HOME / ".codebuddy" / "skills",
+    "lingma": HOME / ".lingma" / "skills",
+    "qwen": HOME / ".qwen" / "skills",
+    "opencode": HOME / ".config" / "opencode" / "skills",
+    "gemini": HOME / ".gemini" / "skills",
+    "codex-legacy": HOME / ".codex" / "skills",
 }
+ALWAYS = ("agents", "claude", "dsh")          # 这三处不管有没有都建
+LIBRARY_URL = "https://github.com/Yari-tuber/math-rap-video/releases/download/v1.0.0/backgrounds_library.zip"
 
 ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 ap.add_argument("--list", action="store_true", help="列出找到的 AI 工具")
 ap.add_argument("--to", nargs="+", metavar="工具或文件夹", help="all、工具名，或任意文件夹路径")
 ap.add_argument("--library", metavar="zip或文件夹", help="背景素材库的压缩包或文件夹")
+ap.add_argument("--get-library", action="store_true", help="从 GitHub 下载背景素材库（97 MB）")
+ap.add_argument("--no-library", action="store_true", help="装 skill 时不顺便下载素材库")
 args = ap.parse_args()
-if not (args.list or args.to or args.library):
+if not (args.list or args.to or args.library or args.get_library):
     print(__doc__)
     sys.exit(0)
 
@@ -114,7 +130,7 @@ def install_to(dest_parent, label):
         shutil.rmtree(dest)
 
     def ignore(folder, names):
-        skip = {"__pycache__", ".git", ".github", ".gitignore", "docs"}
+        skip = {"__pycache__", ".git", ".github", ".gitignore", "docs", "tests"}
         if Path(folder).resolve() == (SKILL / "assets" / "backgrounds").resolve():
             skip |= {n for n in names if n.lower().endswith(".mp4")}   # 视频只留在共享位置
         return skip & set(names)
@@ -133,6 +149,31 @@ if args.list:
     lib_ok = (SHARED / "library.json").exists()
     print(f"共享素材库 {SHARED}：" + (f"{count_clips(SHARED)} 段背景" if lib_ok else "还没有"))
 
+if (args.get_library or (args.to and not args.no_library and not args.library)) and not (SHARED / "library.json").exists():
+    import tempfile
+    import urllib.request
+    tmp = Path(tempfile.gettempdir()) / "mrv_backgrounds_library.zip"
+    print(f"下载背景素材库（97 MB）：{LIBRARY_URL}")
+    try:
+        with urllib.request.urlopen(LIBRARY_URL, timeout=60) as r, open(tmp, "wb") as f:
+            total, got = int(r.headers.get("Content-Length") or 0), 0
+            while True:
+                b = r.read(1 << 20)
+                if not b:
+                    break
+                f.write(b)
+                got += len(b)
+                if total:
+                    print(f"\r  {got * 100 // total}%", end="", flush=True)
+        print()
+        place_library(tmp)
+    except Exception as e:  # noqa: BLE001
+        print(f"下载失败（{e}）。可以用浏览器打开上面的地址下载，再运行：python install.py --library <下载的zip>")
+    finally:
+        tmp.unlink(missing_ok=True)
+elif args.get_library or args.to:
+    print(f"背景素材库已经在 {SHARED}（{count_clips(SHARED)} 段），不用再下")
+
 if args.library:
     place_library(args.library)
 
@@ -141,9 +182,9 @@ if args.to:
     targets = []
     for t in args.to:
         if t == "all":
-            targets += [(k, p) for k, p in TOOLS.items() if p.exists()]
+            targets += [(k, p) for k, p in TOOLS.items() if k in ALWAYS or (p.exists() and k != "codex-legacy")]
         elif t in TOOLS:
-            if TOOLS[t].exists():
+            if t in ALWAYS or t == "codex-legacy" or TOOLS[t].exists():
                 targets.append((t, TOOLS[t]))
             else:
                 print(f"[跳过] {t}：没有找到 {TOOLS[t]}（这个工具可能没装）")
@@ -151,8 +192,10 @@ if args.to:
             Path(t).expanduser().mkdir(parents=True, exist_ok=True)
             targets.append((t, Path(t)))
     for label, p in targets:
+        p.mkdir(parents=True, exist_ok=True)
         install_to(p, label)
     if not (SHARED / "library.json").exists():
-        print("\n注意：还没有背景素材库。拿到素材库压缩包后运行：python install.py --library <压缩包.zip>")
-    print("\n装好后，在对应的 AI 工具里说：帮我做一个讲【知识点】的口诀讲解视频")
+        print("\n注意：还没有背景素材库（只有暗色电影感画风要用）。要用就运行：python install.py --get-library")
+    print("\n装好后新开一个对话，跑一次环境检查：python " + str(Path(__file__).resolve().parent / "mrv.py") + " doctor")
+    print("然后在对应的 AI 工具里说：用 math-rap-video 把【知识点】做成口诀说唱讲题视频")
     print("如果那个工具没有自动认出这个 skill，就说：请先阅读 <上面的安装路径>/SKILL.md，然后按里面的流程做")

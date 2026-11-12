@@ -6,7 +6,10 @@
     python build_video.py <作品目录> sheet           # 从成片每句抽一帧 → 成片_总览.jpg
     python build_video.py <作品目录> all             # 先 check，再 bg + final + sheet（一条命令出片）
 
-storyboard.json 的 backgrounds：
+背景从哪来由画风决定（styles/<画风>/style.json 的 backgrounds），storyboard.json 的 backgrounds 可以覆盖：
+    "source": "library"（自带素材库，按用途挑）/ "folder"（"path": 自己的视频文件夹）/ "image"（"path": 一张图）/
+              "color"（"color" "color2" "texture": grid / chalk / noise）。详见 mrv_bg.py。
+source 是 library 时：
     "plan": [["T0", "problem"], ["L(3)", "trap"], ["L(9)", "demo:quiet"], ["L(5)", "BG01_Chalkboard"], …]
         每项 [切入时间, 用途或片段名]；切点自动提前 lead 秒（默认 0.1），落在小节线上。
         中间有题目图形的段落会自动只挑"安静"片段（没有亮的人脸特写）。
@@ -35,9 +38,24 @@ STEP = sys.argv[2] if len(sys.argv) > 2 else "all"
 if STEP not in ("bg", "final", "sheet", "all"):
     sys.exit(f"不认识的步骤 {STEP}，可用：bg / final / sheet / all")
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from mrv_bg import color_still, folder_clips, still_filter  # noqa: E402
+from mrv_style import load_style, merge  # noqa: E402
+
 ENGINE = str(HERE / "overlay_engine.py")
 SB = json.loads((WORK / "storyboard.json").read_text(encoding="utf-8"))
-BGC = SB.get("backgrounds", {})
+STYLE = load_style(SB.get("style"), WORK)
+BGC = merge(STYLE.get("backgrounds", {}), SB.get("backgrounds", {}))
+SRC = BGC.get("source", "library")
+if SRC == "library":         # 没下素材库也别卡住：先用暗色纯色底出片，提示怎么装
+    from mrv_paths import library_dir as _ld
+    if not (_ld(BGC.get("library"), WORK) / "library.json").exists():
+        print("提示：没找到背景素材库，这次先用暗色纯色底出片。想要电影镜头背景：python "
+              f"\"{HERE / 'install.py'}\" --get-library（97 MB），装好重跑 render", file=sys.stderr)
+        SRC = "color"
+        BGC = merge({"color": "#141A26", "color2": "#06080D", "texture": "noise"}, BGC)
+if SRC not in ("library", "folder", "image", "color"):
+    sys.exit(f"backgrounds.source 只能是 library / folder / image / color，现在是「{SRC}」")
 GRADE = BGC.get("grade", "eq=brightness=-0.16:saturation=0.65:contrast=1.05,vignette=PI/3.2")
 
 
@@ -48,9 +66,12 @@ def engine_info(exprs=()):
     return json.loads(r.stdout)
 
 
-plan = BGC.get("plan", [])
+plan = BGC.get("plan", []) if SRC in ("library", "folder") else []
 INFO = engine_info([str(p[0]) for p in plan])
 T0, T_END, FPS = INFO["t0"], INFO["t_end"], INFO["fps"]
+if SRC == "folder" and not plan:      # 自己的视频文件夹、没写切换计划：每 4 句换一段
+    plan = [["T0", "any"]] + [[f"L({i})", "any"] for i in range(5, len(INFO["lines"]) + 1, 4)]
+    INFO = engine_info([str(p[0]) for p in plan])
 bg_path = WORK / "成片_背景.mp4"
 
 
@@ -63,11 +84,19 @@ def probe_duration(p):
 def resolve_backgrounds():
     from mrv_paths import NOT_FOUND_HINT, library_dir
 
-    lib_dir = library_dir(BGC.get("library"), WORK)
-    lj = lib_dir / "library.json"
-    if not lj.exists():
-        sys.exit(NOT_FOUND_HINT + f"（当前查找的位置：{lib_dir}）")
-    clips = json.loads(lj.read_text(encoding="utf-8"))["clips"]
+    if SRC == "folder":
+        fp = Path(BGC.get("path", ""))
+        lib_dir = fp if fp.is_absolute() else WORK / fp
+        clips = folder_clips(lib_dir)
+        for c in clips:           # 自己的素材没有用途标签：任何用途都能用
+            c["roles"] = ["any"] + [str(p[1]).partition(":")[0] for p in plan]
+    else:
+        lib_dir = library_dir(BGC.get("library"), WORK)
+        lj = lib_dir / "library.json"
+        if not lj.exists():
+            sys.exit(NOT_FOUND_HINT + f"（当前查找的位置：{lib_dir}）。不想下素材库：storyboard.json 里写 "
+                     '"backgrounds": {"source": "color"}，或换一个画风（mrv.py styles）')
+        clips = json.loads(lj.read_text(encoding="utf-8"))["clips"]
     by_id = {c["id"]: c for c in clips}
     if not plan:
         sys.exit("storyboard.json 里没有 backgrounds.plan")
@@ -140,7 +169,25 @@ if STEP == "all":   # 一条命令出片时先体检，有问题就不往下花�
     if r.returncode != 0:
         sys.exit("检查没有通过，先按上面的提示改 storyboard.json / graphics.py，再重新运行")
 
-if STEP in ("bg", "all"):
+if STEP in ("bg", "all") and SRC in ("image", "color"):
+    dur = T_END - T0
+    if SRC == "color":
+        still = WORK / "_背景.png"
+        color_still(BGC).convert("RGB").save(still)
+        print(f"  背景：纯色{('（' + BGC['texture'] + '）') if BGC.get('texture', 'none') != 'none' else ''} {BGC.get('color')}")
+    else:
+        still = Path(BGC.get("path", ""))
+        still = still if still.is_absolute() else WORK / still
+        if not still.is_file():
+            sys.exit(f"backgrounds.path 指向的图片不存在：{still}")
+        print(f"  背景：一张图 {still.name}（{BGC.get('motion', 'slow-zoom')}）")
+    vf = still_filter(dur, BGC.get("motion", "slow-zoom"), FPS) + f",{GRADE},format=yuv420p"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-loop", "1", "-i", str(still), "-t", f"{dur:.3f}",
+                    "-vf", vf, "-c:v", "libx264", "-crf", "16", "-preset", "fast", "-an", str(bg_path)], check=True)
+    (WORK / "背景分配.json").write_text(json.dumps([{"at": T0, "dur": round(dur, 3), "source": SRC,
+                                                    "file": str(still)}], ensure_ascii=False, indent=1), encoding="utf-8")
+    print("背景完成", bg_path)
+elif STEP in ("bg", "all"):
     segs = resolve_backgrounds()
     inputs, filters = [], []
     for k, s in enumerate(segs):

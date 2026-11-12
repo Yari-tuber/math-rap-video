@@ -1,135 +1,125 @@
-# 口诀讲解视频制作包（math-rap-video）
+# 口诀说唱讲题视频（math-rap-video）
 
-把一个知识点做成"口诀 + 图形演示"的讲解短视频：暗色电影感背景、顶部常驻口诀、中间图形一步步演示、底部逐句字幕，画面跟着唱词卡点。
+把一个知识点做成「AI 说唱 + 口诀 + 图形演示」的讲题短视频：顶部常驻口诀，中间图形跟着唱词一步步演示，底部逐句字幕，结果数字卡在唱到它的那一下。
 
-这是一个给 AI 助手用的 skill（说明书 + 脚本 + 样例 + 背景素材库）。**音频由你自己准备**（任何 AI 音乐平台生成的歌、真人说唱、普通配音都可以）；背景用自带素材库；图形、口诀、公式、字幕由脚本画出来并合成。Claude、Codex 等能运行命令的 AI 可以直接照着做，只能聊天的 AI 也有对应的用法。
+这是一个给 AI 用的 skill：Claude Code、Codex、DeepSeek Harness、Gemini CLI、opencode、Cursor……能读文件、能跑命令的 AI 都能照着做；只能聊天的 AI 也有用法。
 
-![样片总览：数线段口诀，每句歌词一格](docs/demo_overview.jpg)
+![勾股定理：每句一格](docs/gougu_overview.jpg)
 
-## 样片
+## 2.0 有什么新的
 
-| 题目 | 口诀 | 下载 |
-|---|---|---|
-| 数线段 | 点数减一，连加到一 | [横屏](https://github.com/Yari-tuber/math-rap-video/releases/latest/download/demo_shuxianduan.mp4) · [竖屏](https://github.com/Yari-tuber/math-rap-video/releases/latest/download/demo_shuxianduan_vertical.mp4) |
-| 高斯求和 | 首尾相加，乘个数一半 | [横屏](https://github.com/Yari-tuber/math-rap-video/releases/latest/download/demo_gauss_sum.mp4) |
-| 三角形内角和 | 三角一百八，减两角得它 | [横屏](https://github.com/Yari-tuber/math-rap-video/releases/latest/download/demo_triangle_angles.mp4) |
-
-样片里的歌是 AI 音乐模型生成的，背景是 AI 视频模型生成的，图形由本包的脚本绘制。
+- **用什么音乐模型都行。** 有 API 就让 AI 直接生成（现在支持 ElevenLabs）；没有就用 skill 给的提示词去 Suno、海绵音乐、Mureka 网页生成，下载回来丢进去。
+- **不用再自己出字幕。** 丢进一首 mp3，skill 自己分出人声、按歌词把每个字对到第几秒唱、量哪一版最好、查哪句可能没唱。Suno 的 mp3 里嵌着歌词，连歌词都能自己读出来。
+- **画风和背景都能换。** 自带三套画风（暗色电影感、黑板粉笔、发光线条），背景能换成自带素材库、自己的视频文件夹、一张图或纯色。改一个词就换，题目图形不用动。
+- **提示词都在里面。** 写口诀和歌词的提示词、给各家音乐模型的提示词，复制就能用。
+- **一个入口。** 所有步骤都是 `scripts/mrv.py` 的一条命令，每步做完打印下一条完整命令，较弱的模型也能照着走完。
+- 新样例：**勾股定理**，原理段用拼图证明（四个三角形换个摆法，空出来的面积一样大）。
 
 ## 原理（三句话）
 
-1. **节奏感是写词时定好的**：每分钟 90 拍，一句歌词正好唱一小节，全篇押一个韵。
-2. **画面靠一张"时间表"跟上唱词**：把歌识别一遍，记下每个字是第几秒唱的；分镜里写"第 9 句唱到『四』字时出现 4"，程序自己去查秒数。所以换一版音频、换一个音乐平台，画面都不用改。
-3. **图形是程序一张张画的**：AI 只写三份文字（歌词、分镜表、画图程序），脚本负责画图、挑背景、合成，所以数字和图形不会错。
-
-完整讲解和不写代码的做法（剪映）见 [制作教程](references/teaching.md)。
-
-## 里面有什么
-
-| 目录 | 内容 |
-|---|---|
-| `SKILL.md` | 完整流程。**让 AI 帮你做时，先让它读这个文件** |
-| `references/` | 分项说明：怎么写歌词、怎么准备音频、画面怎么写、素材库、常见问题、制作教程、各种 AI 的实测记录 |
-| `scripts/` | 命令行脚本（Python） |
-| `examples/shuxianduan/` | 完整样例：数线段口诀 |
-| `templates/blank/` | 空白模板 |
-| `assets/backgrounds/` | 背景素材库的位置。素材库单独下载（见下） |
-
-## 需要准备
-
-- Python 3.10 以上：`pip install pillow numpy librosa pypinyin`
-- ffmpeg（命令行里能运行 `ffmpeg` 和 `ffprobe`）
-- 背景素材库：到 [Releases](https://github.com/Yari-tuber/math-rap-video/releases/latest) 下载 `backgrounds_library.zip`（26 段背景，约 97 MB）
-- 一个 AI 助手，或者会用命令行的人
+1. **好记是写词时定好的。** 每分钟 90 拍，一句歌词正好一小节，全篇押一个韵，口诀单独唱两遍。这样耳朵能预判下一句什么时候来。
+2. **画面靠一张时间表跟上唱词。** 先把歌里每个字第几秒唱对出来；分镜里写「第 9 句唱到『四』时出现 4」，程序自己去查秒数。所以换一版歌、换一家音乐模型，画面都不用改。
+3. **图形是程序一帧帧画的，不是视频模型生成的。** AI 只写歌词、分镜和画图程序，数字和图形不会画错。
 
 ## 安装
 
-下载本仓库（`git clone`，或在 Releases 里下载 `math-rap-video.skill`，它就是 zip，改后缀即可解压），在文件夹里运行：
+要 Python 3.11 以上和 ffmpeg（Windows：`winget install Python.Python.3.12`、`winget install Gyan.FFmpeg`）。
 
 ```bash
-python scripts/install.py --library <backgrounds_library.zip 的路径>
+git clone https://github.com/Yari-tuber/math-rap-video.git
 ```
 
 ```bash
-python scripts/install.py --to all
+python math-rap-video/scripts/install.py --to all
 ```
 
 ```bash
-python scripts/check_env.py
+python math-rap-video/scripts/mrv.py doctor --fix
 ```
 
-第一条把素材库放到共享位置（`~/.math-rap-video/backgrounds/`）；第二条把 skill 装进这台电脑上找到的所有 AI 工具；第三条逐项检查环境并告诉你缺什么。`python scripts/install.py --list` 可以看找到了哪些工具。
+第一条下载；第二条把 skill 装进这台电脑上的 AI 工具（`~/.agents/skills` 通用位置，Codex、Gemini CLI、opencode、Cursor、DeepSeek Harness 都读；再加 `~/.claude/skills`、`~/.dsh/skills`，以及 Trae、Qoder 这些找到了的），顺便下好背景素材库（97 MB）；第三条检查环境，缺的自动装进一个独立环境（不碰你系统里的 Python）。对齐模型第一次用时自动下载约 1.8 GB，国内网络先设 `HF_ENDPOINT=https://hf-mirror.com`。
 
-只用 Claude 的话，也可以直接安装 `math-rap-video.skill`，再运行第一条命令安放素材库。
+装完在 AI 工具里**新开一个对话**。
 
 ## 怎么用
 
-### 能读文件、能运行命令的 AI
+对 AI 说：
 
-`install.py` 认识这些工具存放 skill 的位置：
+> 用 math-rap-video 把【勾股定理】做成口诀说唱讲题视频。先把口诀和歌词给我确认，再往下做。
 
-| 工具 | 位置 |
+它会照这个顺序走，每一步做完会告诉你结果：
+
+1. **写口诀和歌词**：先验算每个数字、写清口诀成立的前提、想好评论区会挑什么刺，再写。你确认。
+2. **出歌**：它会问你「有没有音乐模型的 API」。有就给它密钥，它直接生成两三版（会先告诉你要花多少额度）；没有，它把排好的提示词给你，你去 Suno / 海绵 / Mureka 生成两三首，下载回来交给它。
+3. **对时间、挑一版**：它告诉你选了哪版、为什么，哪几句要你听一下。
+4. **写画面**：出每句一格的预览图，你提意见（按句号说，比如「第 9 句的正方形再大一点」）。
+5. **出片**：横屏，需要的话再出一条竖屏。
+
+## 提示词（直接复制）
+
+| 文件 | 用途 |
 |---|---|
-| Claude Code / Claude 桌面版 | `~/.claude/skills/` |
-| Codex | `~/.codex/skills/` |
-| Gemini CLI | `~/.gemini/skills/` |
-| opencode | `~/.config/opencode/skills/` |
-| 其他遵循同一约定的工具 | `~/.agents/skills/` |
+| [`prompts/写词.md`](prompts/写词.md) | 写口诀和歌词。交给任何 AI 都行，可以选「口诀型」（公式、方法）或「反直觉型」（悖论、谜题） |
+| [`prompts/音乐模型/Suno.md`](prompts/音乐模型/Suno.md) | Suno：设置、三套风格词、排除词、歌词框写法 |
+| [`prompts/音乐模型/海绵音乐.md`](prompts/音乐模型/海绵音乐.md) | 海绵音乐（免费、国内直接能用） |
+| [`prompts/音乐模型/Mureka.md`](prompts/音乐模型/Mureka.md) | Mureka |
+| [`prompts/音乐模型/通用.md`](prompts/音乐模型/通用.md) | 任何音乐模型（这串风格词在 ElevenLabs 上实测过）+ 实测经验 |
 
-装好后直接说：
+跑 `mrv.py lyrics` 时，这几份会自动把你的歌词填进去（数字写成汉字、去掉括号，模型唱得更准），放在作品目录的 `给音乐模型/` 里。
 
-> 帮我做一个讲【知识点】的口诀讲解视频，给【什么人】看。先把口诀、歌词和分镜表写给我确认，不要直接往下做。
+Suno 那份按官方文档和社区经验整理，作者没有 Suno 会员、没有亲自实测；用下来哪里不对，欢迎提 issue。
 
-如果那个工具没有自动认出这个 skill（比如 Cursor、Trae、通义灵码），就把文件夹放在任意位置，在前面加一句：
+## 画风和背景
 
-> 请先阅读 `<文件夹路径>/SKILL.md`，然后按里面的流程做。需要读 `references/` 里的文件时按 SKILL.md 的指引去读。
+![三种画风](docs/styles.jpg)
 
-之后一共四轮对话：确认歌词 → 你把音频交给它挑 → 看预览图提意见 → 出片。提意见按句号说（"第 9 句的弧线太低"）。
+```json
+"style": "glow"
+```
 
-### 只能聊天、不能运行命令的 AI（网页版 ChatGPT、豆包、DeepSeek、Kimi 等）
+| 画风 | 样子 | 背景 |
+|---|---|---|
+| `cinema` | 暗色电影感，蓝色图形、黄色结果数字 | 自带素材库：26 段 AI 生成的暗色镜头，按用途自动挑（抛问题、陷阱、给口诀、示范……） |
+| `chalk` | 黑板粉笔 | 墨绿黑板 |
+| `glow` | 发光线条，粗宋体口诀 | 深蓝网格 |
 
-用 `scripts/chat_pack.py` 生成提示包，整个发给它；脚本由你自己运行：
+背景换成自己的：`"backgrounds": {"source": "folder", "path": "我的视频文件夹"}`，或 `{"source": "image", "path": "图.jpg"}`，或 `{"source": "color", "color": "#101820", "texture": "grid"}`。自己做画风见 [`references/styles.md`](references/styles.md)。
+
+![背景素材库](docs/library_overview.jpg)
+
+## 只能聊天的 AI（网页版 ChatGPT、豆包、DeepSeek、Kimi 等）
+
+用 `scripts/chat_pack.py` 生成提示包发给它，命令由你自己运行：
 
 | 步骤 | 你运行 | 然后 |
 |---|---|---|
-| 写歌词 | `python scripts/chat_pack.py lyrics "知识点"` | 把生成的文件发给 AI，把它的回答存成 `<作品目录>/lyrics.md` |
-| 做音频 | 按 `references/audio.md` 准备，再运行 `prepare_audio.py` | 得到 `timing.json` |
-| 写画面 | `python scripts/chat_pack.py visuals <作品目录>` | 把生成的文件发给 AI，把它给的两个文件存进作品目录 |
-| 检查修改 | `python scripts/chat_pack.py fix <作品目录>` | 有报错或画面不对：把生成的文件和预览图一起发给 AI，改完再运行一次 |
-| 出片 | `python scripts/build_video.py <作品目录> all` | 得到 `成片.mp4` |
+| 写歌词 | 把 `prompts/写词.md` 和知识点发给它 | 把它给的歌词存成 `<作品目录>/lyrics.md`，运行 `python scripts/mrv.py lyrics <作品目录>` |
+| 出歌 | 打开 `<作品目录>/给音乐模型/`，照着去音乐平台生成 | 运行 `python scripts/mrv.py song <作品目录> --song 歌.mp3` |
+| 写画面 | `python scripts/chat_pack.py visuals <作品目录>` | 把生成的文件发给它，把它给的两个文件存进作品目录 |
+| 检查修改 | `python scripts/mrv.py check <作品目录>`，有问题再 `python scripts/chat_pack.py fix <作品目录>` | 把生成的文件和预览图一起发给它，改完再检查 |
+| 出片 | `python scripts/mrv.py render <作品目录>` | 得到 `成片.mp4` |
 
-### 不想碰代码
+## 不想碰代码
 
-看 [制作教程](references/teaching.md) 里的"入门版"：用剪映完成同样的版式。
+看 [制作教程](references/teaching.md) 里的剪映做法。
 
-## 一次完整制作的步骤
+## 实测
 
-1. 定口诀、写歌词和分镜（AI 写，你确认）
-2. 你按 `references/audio.md` 的要求准备音频（用哪家平台、谁的声音，你决定）
-3. 运行 `prepare_audio.py`：算出每句、每个字的时间，并告诉你这版音频能不能用
-4. AI 写 `storyboard.json` 和 `graphics.py`
-5. 运行 `check` 和 `sheet`：看每句一格的预览图，确认画面
-6. 运行 `build_video.py`：出片（约 10 分钟）。需要竖屏版时再运行 `make_vertical.py`
-7. 看一遍成片，重点听口诀和结果数字是否和画面同时出现
+- 2.0：勾股定理从写词、用 ElevenLabs 接口出两版歌、自动对时间（两版都可用，选了 24 句全部落在小节头的那版）到出片走通。只用强制对齐的时间，和「识别 + 对齐」合起来的结果几乎一样（24 句里 22 句起点完全相同，另外 2 句差 0.08 秒）。往歌词里塞一句没唱的，能查出来。
+- 1.x：Claude、Claude Haiku、Codex 只凭文档独立做出过成片。详情见 [实测记录](references/compatibility.md)。
 
-换音频时只需要重做第 3、5、6 步。
+## 致谢
 
-## 哪些 AI 实际跑通过
-
-Claude、较小的 Claude 模型（Haiku）、Codex 都只凭本包文档独立做出了成片；只能聊天的用法也用较小的模型模拟验证过。Gemini CLI、opencode、Cursor 和各家网页版聊天 AI 没有实测。详情和各模型容易出问题的地方见 [实测记录](references/compatibility.md)。
-
-## 背景素材库
-
-![背景素材库总览](docs/library_overview.jpg)
-
-26 段约 8 秒的暗色背景，按 9 种用途打了标签（抛问题、陷阱、给口诀、示范、过渡、口诀大字、讲原理、恍然大悟、收尾），出片时自动挑。可以用 `scripts/library_tool.py` 加自己的片段，见 `references/library.md`。
+- 逐字对齐：[Qwen3-ForcedAligner-0.6B](https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B-hf)（阿里通义千问团队，Apache-2.0），运行时下载，不随本包分发。
+- 人声分离：[demucs](https://github.com/facebookresearch/demucs)（Alexandre Défossez / Meta，MIT）。
+- 节拍检测 [librosa](https://github.com/librosa/librosa)（ISC），拼音匹配 [pypinyin](https://github.com/mozillazg/python-pinyin)（MIT）。
+- 版式参考了抖音上「口诀 + 说唱」类数学科普视频（比如 Rap&科学）的常见做法；本包不包含任何他人的视频、音乐或素材。
 
 ## 许可证
 
-本仓库的内容（说明书、脚本、样例、模板）按 [MIT 许可证](LICENSE) 发布：可以自由使用、修改、再分发和商用，保留版权声明即可。
+[MIT](LICENSE)：可以自由使用、修改、再分发和商用，保留版权声明即可。
 
 ## 版权提示
 
-- 音频的版权和商用授权由提供音频的一方确认（各音乐平台的条款不同）
-- 自带素材库的片段是用 AI 视频模型生成的通用背景；你自己加入的片段请确认有权使用
-- 视频版式参考了抖音上"口诀 + 说唱"类数学科普视频的常见做法；本包不包含任何他人的视频、音乐或素材
+- 歌的版权和商用授权看你用的音乐平台：比如 Suno 免费档不能商用，ElevenLabs Creator 档起可以，海绵、Mureka 以各自协议为准。
+- 自带素材库是用 AI 视频模型生成的通用背景；你自己加入的片段请确认有权使用。不要拿电影片段当背景。

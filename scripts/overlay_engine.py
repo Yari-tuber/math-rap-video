@@ -54,6 +54,10 @@ _tp = WORK / SB.get("timing", "timing.json")
 if not _tp.exists():
     _die(f"找不到 {_tp.name}：先运行 prepare_audio.py 处理音频")
 TM = json.loads(_tp.read_text(encoding="utf-8"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from mrv_style import load_style, merge, palette_colors, rgba  # noqa: E402
+
+STYLE = load_style(SB.get("style"), WORK)   # 画风：颜色、字体、横幅、字幕、发光（storyboard 里同名的键可以覆盖）
 
 WIDTH, HEIGHT = 1920, 1080
 FPS = SB.get("fps", 30)
@@ -61,7 +65,8 @@ S = SB.get("supersample", 2)
 BPM = SB.get("bpm", TM["bpm"])
 BEAT = 60 / BPM
 BEAT0 = SB.get("beat0", TM["beat0"])
-LINES = [(l["start"], l["end"], l["text"]) for l in TM["lines"]]
+LINES = [(l["start"], l["end"], l["text"]) for l in TM["lines"]]   # text：唱出来的字（送唱版），C() W() 按它找
+SHOW = [l.get("show") or l["text"] for l in TM["lines"]]           # show：字幕上显示的写法（lyrics.md 原文）
 _CT = [l.get("ct") for l in TM["lines"]]
 NL = len(LINES)
 SONG = SB.get("song", TM["audio"])
@@ -96,8 +101,16 @@ def W(i, s, n=1):
     for _ in range(n):
         pos = text.find(s, pos + 1)
         if pos < 0:
+            break
+    if pos >= 0:
+        return C(i, pos + 1)
+    show = SHOW[i - 1]      # 唱的字里没有（比如字幕写 3²、唱的是「三的平方」）：在字幕原文里找，按位置比例换算
+    pos = -1
+    for _ in range(n):
+        pos = show.find(s, pos + 1)
+        if pos < 0:
             raise ValueError(f"第 {i} 句「{text}」里找不到第 {n} 个「{s}」")
-    return C(i, pos + 1)
+    return C(i, min(len(text), int(pos / max(1, len(show)) * len(text)) + 1))
 
 
 def beat(k):
@@ -128,13 +141,9 @@ if "t_end" in SB:
 _NS.update(T0=T0, T_END=T_END)
 
 # ---------------- 颜色 / 字体 ----------------
-COLORS = {
-    "white": (255, 255, 255, 255), "yellow": (255, 216, 74, 255), "red": (236, 84, 106, 255),
-    "blue": (76, 141, 255, 255), "blue_dark": (40, 92, 200, 255), "blue_light": (130, 185, 255, 255),
-    "gray": (150, 150, 160, 255), "orange": (255, 96, 48, 255), "line": (230, 236, 255, 255),
-    "green": (92, 214, 140, 255),
-}
-COLORS.update({k: tuple(v) for k, v in SB.get("colors", {}).items()})
+COLORS = palette_colors(STYLE)   # 语义名（text primary result…）+ 旧名字（white blue yellow…）
+COLORS.update({k: rgba(v) for k, v in SB.get("colors", {}).items()})
+STROKE = COLORS.get("stroke", (0, 0, 0, 255))
 
 
 def col(c):
@@ -159,12 +168,12 @@ def _first_font(cands, what):
 _skill_fonts = Path(__file__).resolve().parent.parent / "assets" / "fonts"
 _bundled = sorted(str(p) for p in _skill_fonts.glob("*.[to]t[fc]")) if _skill_fonts.exists() else []
 _fonts = SB.get("fonts", {})
-FONT_HEAVY = _first_font(_fonts.get("heavy", []) + _bundled + [
+FONT_HEAVY = _first_font(_fonts.get("heavy", []) + STYLE["fonts"].get("heavy", []) + _bundled + [
     "C:/Windows/Fonts/NotoSansSC-VF.ttf", "C:/Windows/Fonts/msyhbd.ttc", "C:/Windows/Fonts/simhei.ttf",
     "/System/Library/Fonts/PingFang.ttc", "/System/Library/Fonts/STHeiti Medium.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Black.ttc", "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
     "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"], "标题")
-FONT_SUB = _first_font(_fonts.get("subtitle", []) + [
+FONT_SUB = _first_font(_fonts.get("subtitle", []) + STYLE["fonts"].get("subtitle", []) + [
     "C:/Windows/Fonts/msyhbd.ttc", "C:/Windows/Fonts/NotoSansSC-VF.ttf", "C:/Windows/Fonts/simhei.ttf",
     "/System/Library/Fonts/PingFang.ttc", "/System/Library/Fonts/STHeiti Medium.ttc",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"] + _bundled,
@@ -281,7 +290,7 @@ _TRACK = {"on": False, "bbox": None}
 
 @lru_cache(maxsize=512)
 def text_img(text, size, color=(255, 255, 255, 255), path=None, weight=900, stroke=0,
-             stroke_color=(0, 0, 0, 255)):
+             stroke_color=None):
     """把文字渲染成 S 倍尺寸的 RGBA 小图（有缓存）。"""
     path = path or FONT_HEAVY
     f = font(path, size, weight)
@@ -290,7 +299,7 @@ def text_img(text, size, color=(255, 255, 255, 255), path=None, weight=900, stro
     w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
     im = Image.new("RGBA", (w + 4 * S, h + 4 * S), (0, 0, 0, 0))
     ImageDraw.Draw(im).text((-bbox[0] + 2 * S, -bbox[1] + 2 * S), text, font=f, fill=col(color),
-                            stroke_width=sw, stroke_fill=stroke_color)
+                            stroke_width=sw, stroke_fill=stroke_color or STROKE)
     return im
 
 
@@ -529,21 +538,21 @@ class Stage:
 # ---------------- 通用图层（读 storyboard.json） ----------------
 _banner = SB.get("banner")
 if _banner:
-    _banner = dict(_banner, parts=[(p, tm(tp, f"banner.parts「{p}」")) for p, tp in _banner["parts"]],
+    _banner = dict(merge(STYLE["banner"], _banner), parts=[(p, tm(tp, f"banner.parts「{p}」")) for p, tp in _banner["parts"]],
                    pulses=[tm(x, "banner.pulses") for x in _banner.get("pulses", [])])
 _formulas = []
 for n, f in enumerate(SB.get("formulas", [])):
     w = f"formulas[{n}]"
     _formulas.append((tm(f["show"], w + ".show"), tm(f["hide"], w + ".hide"),
                       [(tk[0], col(tk[1]), tk[2], tm(tk[3], f"{w}「{tk[0]}」")) for tk in f["tokens"]],
-                      f.get("y", 830)))
+                      f.get("y", STYLE["formula"].get("y", 830))))
 _keywords = []
 for n, k in enumerate(SB.get("keywords", [])):
     w = f"keywords[{n}]「{k.get('text')}」"
     _keywords.append(dict(k, show=tm(k["show"], w), pop=tm(k.get("pop", k["show"]), w), hide=tm(k["hide"], w)))
 _arrows = [dict(a, show=tm(a["show"], f"arrows[{n}]"), hide=tm(a["hide"], f"arrows[{n}]"))
            for n, a in enumerate(SB.get("arrows", []))]
-_sub = SB.get("subtitles", {})
+_sub = merge(STYLE["subtitles"], SB.get("subtitles", {}))
 
 
 def draw_banner(canvas, t):
@@ -554,7 +563,8 @@ def draw_banner(canvas, t):
         if tp <= t < tp + 0.35:
             pulse = 1 + 0.12 * math.sin(math.pi * (t - tp) / 0.35)
     size = _banner.get("size", 84)
-    ims = [text_img(p, size, (255, 255, 255, 255), FONT_HEAVY, 900, stroke=3) for p, _ in _banner["parts"]]
+    ims = [text_img(p, size, col(_banner.get("color", "text")), FONT_HEAVY, 900, stroke=_banner.get("stroke", 3))
+           for p, _ in _banner["parts"]]
     total = sum(im.width for im in ims) / S
     x = 960 - total / 2 * pulse
     for (p, tp), im in zip(_banner["parts"], ims):
@@ -631,14 +641,23 @@ def draw_arrows(canvas, t):
 
 @lru_cache(maxsize=128)
 def sub_img(text):
+    """字幕：画风里 box=true 是半透明底框，false 是只有字（带描边）。"""
     f = font(FONT_SUB, _sub.get("size", 64))
-    bbox = f.getbbox(text)
+    sw = int(_sub.get("stroke", 0) * S)
+    bbox = f.getbbox(text, stroke_width=sw)
     w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    pad_x, pad_y = 22 * S, 12 * S
+    pad_x, pad_y = (22 * S, 12 * S) if _sub.get("box", True) else (6 * S, 6 * S)
     im = Image.new("RGBA", (w + 2 * pad_x, h + 2 * pad_y), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
-    d.rectangle([0, 0, im.width, im.height], fill=(0, 0, 0, _sub.get("box_alpha", 165)))
-    d.text((pad_x - bbox[0], pad_y - bbox[1]), text, font=f, fill=(255, 255, 255, 255))
+    if _sub.get("box", True):
+        bc = rgba(_sub.get("box_color", "#000000"))[:3] + (int(_sub.get("box_alpha", 165)),)
+        r = int(_sub.get("radius", 0) * S)
+        if r:
+            d.rounded_rectangle([0, 0, im.width - 1, im.height - 1], r, fill=bc)
+        else:
+            d.rectangle([0, 0, im.width, im.height], fill=bc)
+    d.text((pad_x - bbox[0], pad_y - bbox[1]), text, font=f, fill=col(_sub.get("color", "text")),
+           stroke_width=sw, stroke_fill=STROKE)
     return im
 
 
@@ -646,10 +665,10 @@ def draw_subtitles(canvas, t):
     if _sub.get("enabled", True) is False:
         return
     lead = _sub.get("lead", 0.12)
-    for i, (s, e, tx) in enumerate(LINES):
+    for i, (s, e, _tx) in enumerate(LINES):
         nxt = LINES[i + 1][0] if i + 1 < NL else T_END
         if s - lead <= t < nxt - lead:
-            im = sub_img(tx.replace("，", " ").replace(",", " "))
+            im = sub_img(SHOW[i].replace("，", " ").replace(",", " "))
             sc = min(1.0, 1800 * S / im.width)  # 太长就缩小，保证不出画面
             put(canvas, im, 960, _sub.get("y", 1010), sc, fade(t, s - lead, T_END, 0.06))
 
@@ -679,6 +698,25 @@ if SB.get("graphics"):
 
 
 
+GLOW = STYLE.get("glow")
+if "glow" in SB:
+    GLOW = SB["glow"]
+
+
+def glow(canvas):
+    """画风里有 glow 时，给题目图形垫一层柔光：缩小四分之一模糊再放大，比全尺寸模糊快十几倍。"""
+    from PIL import ImageFilter
+    r, k = float(GLOW.get("radius", 14)), float(GLOW.get("strength", 0.8))
+    small = canvas.resize((canvas.width // 4, canvas.height // 4), Image.BILINEAR)
+    small = small.filter(ImageFilter.GaussianBlur(max(0.5, r * S / 4)))
+    g = small.resize(canvas.size, Image.BILINEAR)
+    g.putalpha(g.getchannel("A").point(lambda v: int(min(255, v * k))))
+    out = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    out.alpha_composite(g)
+    out.alpha_composite(canvas)
+    return out
+
+
 def render(t):
     _TEXTS.clear()
     canvas = Image.new("RGBA", (WIDTH * S, HEIGHT * S), (0, 0, 0, 0))
@@ -687,6 +725,8 @@ def render(t):
     if _TRACK["on"]:
         bb = canvas.getchannel("A").getbbox()
         _TRACK["bbox"] = tuple(v / S for v in bb) if bb else None
+    if GLOW and canvas.getchannel("A").getbbox():
+        canvas = glow(canvas)
     draw_arrows(canvas, t)
     draw_keywords(canvas, t)
     draw_formulas(canvas, t)
@@ -710,10 +750,23 @@ def line_preview_time(i, at=None):
 
 
 BG_PREVIEW = (26, 28, 36, 255)
+_PREVIEW_IM = None   # 画风背景是纯色 / 网格 / 黑板时，预览图也垫同样的底，看得出字和图形配不配
+
+
+def _preview_bg():
+    global _PREVIEW_IM
+    if _PREVIEW_IM is None:
+        bgs = merge(STYLE.get("backgrounds", {}), SB.get("backgrounds", {}))
+        if bgs.get("source") == "color":
+            from mrv_bg import color_still
+            _PREVIEW_IM = color_still(bgs, (WIDTH, HEIGHT))
+        else:
+            _PREVIEW_IM = Image.new("RGBA", (WIDTH, HEIGHT), BG_PREVIEW)
+    return _PREVIEW_IM
 
 
 def preview_frame(t):
-    im = Image.new("RGBA", (WIDTH, HEIGHT), BG_PREVIEW)
+    im = _preview_bg().copy()
     im.alpha_composite(render(t))
     return im
 

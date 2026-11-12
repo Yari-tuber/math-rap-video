@@ -1,0 +1,42 @@
+{
+  "id": "chalk",
+  "name": "黑板粉笔",
+  "desc": "墨绿黑板底，图形像粉笔画的（白、粉黄、粉蓝），字幕不加底框、用粉笔白。不用下素材库也能出片，适合几何、作图类的题。",
+  "palette": {
+    "text": "#F4F1E8",
+    "primary": "#BFE3F2",
+    "primary_dark": "#7FB8CF",
+    "primary_light": "#E3F4FA",
+    "highlight": "#F2A7B8",
+    "result": "#F7E27A",
+    "accent": "#F5B66B",
+    "ok": "#B7E4A6",
+    "muted": "#A8B5AD",
+    "line": "#EDEAE0",
+    "stroke": "#1E2B24"
+  },
+  "banner": {
+    "y": 78,
+    "size": 80,
+    "color": "result",
+    "stroke": 4
+  },
+  "formula": {
+    "y": 830
+  },
+  "subtitles": {
+    "y": 1012,
+    "size": 62,
+    "color": "text",
+    "box": false,
+    "stroke": 5
+  },
+  "glow": null,
+  "backgrounds": {
+    "source": "color",
+    "color": "#22342B",
+    "color2": "#16241D",
+    "texture": "chalk",
+    "grade": "vignette=PI/4"
+  }
+}
