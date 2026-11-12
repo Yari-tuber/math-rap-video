@@ -455,8 +455,19 @@ def check(a):
     if r.returncode != 0:
         print("\n检查没过：按上面的提示改 storyboard.json / graphics.py，再跑一次。")
         sys.exit(4)
+    # 先把背景铺好，预览图里垫的就是真实的背景镜头，看得出镜头和图形搭不搭
+    bgv = w / "成片_背景.mp4"
+    newest = max((w / f).stat().st_mtime for f in ("storyboard.json", "timing.json") if (w / f).exists())
+    if not bgv.exists() or bgv.stat().st_mtime < newest:
+        print("\n铺背景（预览图要垫真实的背景镜头，约 1 分钟）…", flush=True)
+        r = run([sys.executable, HERE / "build_video.py", w, "bg"], capture_output=True, text=True, encoding="utf-8",
+                errors="replace")
+        if r.returncode != 0:
+            last = ((r.stderr or r.stdout or "").strip().splitlines() or [""])[-1]
+            print(f"  背景没铺成，预览图先用暗色底。{last}")
     run([sys.executable, eng, w, "sheet", "--pages"])
-    print(f"\n预览图：{w / '分镜预览.jpg'}（每句一格）和 分镜预览_p1.jpg…（大图）。能看图就打开看：每句画面对不对、字有没有压住。")
+    print(f"\n预览图：{w / '分镜预览.jpg'}（每句一格，垫的是真实背景）和 分镜预览_p1.jpg…（大图）。"
+          "能看图就打开看：每句画面对不对、字有没有压住、背景镜头和图形搭不搭。")
     nxt(f"{cmd('render', w, '--part', '<起秒>', '<止秒>')} 先出 10 秒看看；没问题再 {cmd('render', w)}")
 
 

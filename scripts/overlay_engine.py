@@ -765,8 +765,27 @@ def _preview_bg():
     return _PREVIEW_IM
 
 
+_BGV = WORK / "成片_背景.mp4"
+
+
+def _bg_video_frame(t):
+    """背景已经铺好（成片_背景.mp4 比分镜、时间都新）时，预览垫上那一刻真实的背景镜头。"""
+    try:
+        if not _BGV.exists() or _BGV.stat().st_mtime < max((WORK / f).stat().st_mtime for f in
+                                                            ("storyboard.json", SB.get("timing", "timing.json"))):
+            return None
+    except FileNotFoundError:
+        return None
+    import subprocess
+    r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{max(0.0, t - T0):.3f}", "-i", str(_BGV), "-frames:v", "1",
+                        "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{WIDTH}x{HEIGHT}", "-"], capture_output=True)
+    if r.returncode != 0 or len(r.stdout) != WIDTH * HEIGHT * 4:
+        return None
+    return Image.frombytes("RGBA", (WIDTH, HEIGHT), r.stdout)
+
+
 def preview_frame(t):
-    im = _preview_bg().copy()
+    im = _bg_video_frame(t) or _preview_bg().copy()
     im.alpha_composite(render(t))
     return im
 
